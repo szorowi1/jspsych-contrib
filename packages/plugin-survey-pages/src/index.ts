@@ -85,83 +85,166 @@ class PluginNamePlugin implements JsPsychPlugin<Info> {
 
   trial(display_element: HTMLElement, trial: TrialType<Info>) {
     //---------------------------------------//
-    // Section 1: Convenience functions
+    // Section 1: Trial setup
     //---------------------------------------//
 
-    function generateHTML(question) {
-      // initialize HTML
-      var html = "";
+    // define current page
+    var current_page = 0;
 
-      // inject CSS for trial
-      html += '<style id="jspsych-survey-pages-css">';
-      html +=
-        ".jspsych-survey-pages-container {display: block; height: 300px; width: 600px; border-top: 2px solid #C8C8C8; border-left: 2px solid #C8C8C8; border-right: 2px solid #C8C8C8; border-top-left-radius: 8px; border-top-right-radius: 8px; text-align: left}";
-      html += ".jspsych-survey-pages-prompt {margin: 1em 24px 0px 24px;}";
-      html +=
-        ".jspsych-survey-pages-opt {display: grid; grid-auto-flow: column; justify-content: start; justify-items: start; align-items: center; column-gap: 8px; margin-top: 4px; margin: 0.75em 36px 0px 24px; padding: 4px 0 4px 0; border: 1px solid #E8E8E8; border-radius: 4px}";
-      html += ".jspsych-survey-pages-opt:hover {background: #F0F0F0}";
-      html += '.jspsych-survey-pages-opt input[type="radio"] {height: 18px; width: 18px}';
-      html +=
-        ".jspsych-survey-pages-nav {display: grid; grid-auto-flow: column; align-items: center; justify-content: space-between; height: 50px; width: 600px; background: #C8C8C8; border: 2px solid #C8C8C8; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; font-size: 14px;}";
-      html += "</style>";
-
-      //
-      html += '<div class="jspsych-survey-pages-container">';
-      html += '<div class="jspsych-survey-pages-prompt">' + question.prompt + "</div>";
-      for (let i = 0; i < question.labels.length; i++) {
-        const required = question.required ? "required" : "";
-        html += '<label class="jspsych-survey-pages-opt">';
-        html += '<input type="radio" name="' + question.name + '" value="0"' + required + ">";
-        html += question.labels[i];
-        html += "</label>";
-      }
-      html += "</div>";
-
-      var allowed = current_page > 0 ? "" : "disabled='disabled'";
-      html += '<div class="jspsych-survey-pages-nav">';
-      html +=
-        '<button id="jspsych-survey-pages-back" class="jspsych-btn" style="margin-right: 5px;" ' +
-        allowed +
-        ">&lt; " +
-        trial.button_label_previous +
-        "</button>";
-      html += `<p>${trial.page_label} ${current_page + 1} of ${trial.questions.length}</p>`;
-      html +=
-        '<button id="jspsych-survey-pages-next" class="jspsych-btn" style="margin-left: 5px;">' +
-        trial.button_label_next +
-        " &gt;</button></div>";
-      html += "</div>";
-
-      return html;
+    // define question order
+    var question_order = [];
+    for (var i = 0; i < trial.questions.length; i++) {
+      question_order.push(i);
+    }
+    if (trial.randomize_question_order) {
+      question_order = this.jsPsych.randomization.shuffle(question_order);
     }
 
+    // define question names
+    for (var i = 0; i < trial.questions.length; i++) {
+      if (!trial.questions[i].name) {
+        const name =
+          "q" + (i + 1 + "").padStart(Math.ceil(Math.log10(trial.questions.length)), "0");
+        trial.questions[i].name = name;
+      }
+    }
+
+    //---------------------------------------//
+    // Section 1: Define HTML + CSS
+    //---------------------------------------//
+
+    // initialize HTML
+    var html = "";
+
+    // inject CSS for trial
+    html += '<style id="jspsych-survey-pages-css">';
+    html +=
+      ".jspsych-survey-pages-container {display: block; height: 300px; width: 600px; border-top: 2px solid #C8C8C8; border-left: 2px solid #C8C8C8; border-right: 2px solid #C8C8C8; border-top-left-radius: 8px; border-top-right-radius: 8px; text-align: left}";
+    html += '.jspsych-survey-pages-container[status="inactive"] {display: none;}';
+    html += ".jspsych-survey-pages-prompt {margin: 1em 24px 0px 24px;}";
+    html +=
+      ".jspsych-survey-pages-opt {display: grid; grid-auto-flow: column; justify-content: start; justify-items: start; align-items: center; column-gap: 8px; margin-top: 4px; margin: 0.75em 36px 0px 24px; padding: 4px 0 4px 0; border: 1px solid #E8E8E8; border-radius: 4px}";
+    html += ".jspsych-survey-pages-opt:hover {background: #F0F0F0}";
+    html += '.jspsych-survey-pages-opt input[type="radio"] {height: 18px; width: 18px}';
+    html +=
+      ".jspsych-survey-pages-nav {display: grid; grid-auto-flow: column; align-items: center; justify-content: space-between; height: 50px; width: 600px; background: #C8C8C8; border: 2px solid #C8C8C8; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; font-size: 14px;}";
+    html += '.jspsych-survey-pages-container[status="inactive"] {display: none;}';
+    html += "</style>";
+
+    // iteratively add questions
+    for (var i = 0; i < trial.questions.length; i++) {
+      // define question
+      const question = trial.questions[question_order[i]];
+
+      // initialize form
+      html += '<form name="jspsych-survey-pages" id="jspsych-survey-pages-form-' + i + '">';
+
+      //
+      html +=
+        '<div class="jspsych-survey-pages-container" id="jspsych-survey-pages-container-' +
+        i +
+        '" status="inactive">';
+      html += '<div class="jspsych-survey-pages-prompt">' + question.prompt + "</div>";
+      for (let j = 0; j < question.labels.length; j++) {
+        const required = question.required ? "required" : "";
+        html += '<label class="jspsych-survey-pages-opt">';
+        html +=
+          '<input type="radio" name="' + question.name + '" value="0" ' + required + "></input>";
+        html += question.labels[j];
+        html += "</label>";
+      }
+
+      // add navigation bar
+      // TODO: dynamic disabled
+      html += '<div class="jspsych-survey-pages-nav">';
+
+      // add back button
+      const disabled = i === 0 || !trial.allow_backward ? "disabled" : "";
+      html +=
+        '<button type="button" ' +
+        'id="jspsych-survey-pages-back-' +
+        i +
+        '" ' +
+        'class="jspsych-btn" ' +
+        'style="margin-right: 5px;"' +
+        disabled +
+        ">" +
+        "&lt; " +
+        trial.button_label_previous +
+        "</button>";
+
+      // add page number
+      html += "<p>" + trial.page_label + " " + i + " of " + trial.questions.length + "</p>";
+
+      // add next button
+      html +=
+        '<button type="submit" ' +
+        'id="jspsych-survey-pages-next-' +
+        i +
+        '" ' +
+        'class="jspsych-btn" ' +
+        'style="margin-left: 5px;">' +
+        trial.button_label_next +
+        " &gt;" +
+        "</button>";
+      html += "</div>";
+
+      // close nav bar
+      html += "</div>";
+
+      // close form
+      html += "</form>";
+    }
+
+    //
+    display_element.innerHTML = html;
+
+    //---------------------------------------//
+    // Section 3: Convenience functions
+    //---------------------------------------//
+
     function btnListener(evt) {
-      evt.target.removeEventListener("click", btnListener);
-      if (this.id === "jspsych-survey-pages-back") {
+      // query number of selected options on current page
+      const n = display_element.querySelectorAll(
+        "#jspsych-survey-pages-container-" +
+          current_page +
+          " .jspsych-survey-pages-opt " +
+          "input[type='radio']:checked"
+      ).length;
+
+      // event handling
+      if (this.type === "button") {
+        evt.target.removeEventListener("click", btnListener);
         back();
-      } else if (this.id === "jspsych-survey-pages-next") {
+      } else if (this.type === "submit" && n > 0) {
+        evt.preventDefault();
+        evt.target.removeEventListener("click", btnListener);
         next();
       }
     }
 
     function show_current_page() {
-      var html = generateHTML(trial.questions[question_order[current_page]]);
-
-      display_element.innerHTML = html;
+      display_element
+        .querySelector("#jspsych-survey-pages-container-" + current_page)
+        .setAttribute("status", "active");
 
       if (current_page != 0 && trial.allow_backward) {
         display_element
-          .querySelector("#jspsych-survey-pages-back")
+          .querySelector("#jspsych-survey-pages-back-" + current_page)
           .addEventListener("click", btnListener);
       }
 
       display_element
-        .querySelector("#jspsych-survey-pages-next")
+        .querySelector("#jspsych-survey-pages-next-" + current_page)
         .addEventListener("click", btnListener);
     }
 
     function next() {
       add_current_page_to_view_history();
+
+      display_element
+        .querySelector("#jspsych-survey-pages-container-" + current_page)
+        .setAttribute("status", "inactive");
 
       current_page++;
 
@@ -175,6 +258,10 @@ class PluginNamePlugin implements JsPsychPlugin<Info> {
 
     function back() {
       add_current_page_to_view_history();
+
+      display_element
+        .querySelector("#jspsych-survey-pages-container-" + current_page)
+        .setAttribute("status", "inactive");
 
       current_page--;
 
@@ -209,27 +296,7 @@ class PluginNamePlugin implements JsPsychPlugin<Info> {
     // Section 2: Response handling
     //---------------------------------------//
 
-    // define question order
-    var question_order = [];
-    for (var i = 0; i < trial.questions.length; i++) {
-      question_order.push(i);
-    }
-    if (trial.randomize_question_order) {
-      question_order = this.jsPsych.randomization.shuffle(question_order);
-    }
-
-    // define question names
-    for (var i = 0; i < trial.questions.length; i++) {
-      if (!trial.questions[i].name) {
-        const name =
-          "q" + (i + 1 + "").padStart(Math.ceil(Math.log10(trial.questions.length)), "0");
-        trial.questions[i].name = name;
-      }
-    }
-    console.log(trial.questions);
-
     // initialize variables
-    var current_page = 0;
     var view_history = [];
 
     var start_time = performance.now();
