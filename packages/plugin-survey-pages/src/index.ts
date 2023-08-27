@@ -41,6 +41,12 @@ const info = <const>{
       pretty_name: "Randomize question order",
       default: false,
     },
+    /** Whether the lowest response anchor is scored as zero (if true) or one (if false). */
+    zero_indexed: {
+      type: ParameterType.BOOL,
+      pretty_name: "Zero-indexed",
+      default: false,
+    },
     /** If true, the subject can return to a previous page. */
     allow_backward: {
       type: ParameterType.BOOL,
@@ -65,6 +71,12 @@ const info = <const>{
       pretty_name: "Button label next",
       default: "Next",
     },
+    /** Setting this to true will enable browser auto-complete or auto-fill for the form. */
+    autoadvance: {
+      type: ParameterType.BOOL,
+      pretty_name: "Allow autoadvance",
+      default: false,
+    },
   },
 };
 
@@ -87,9 +99,6 @@ class PluginNamePlugin implements JsPsychPlugin<Info> {
     //---------------------------------------//
     // Section 1: Trial setup
     //---------------------------------------//
-
-    // define current page
-    var current_page = 0;
 
     // define question order
     var question_order = [];
@@ -118,95 +127,139 @@ class PluginNamePlugin implements JsPsychPlugin<Info> {
 
     // inject CSS for trial
     html += '<style id="jspsych-survey-pages-css">';
+    html += "body {background-color: rgb(243,243,243);}";
     html +=
-      ".jspsych-survey-pages-container {display: block; height: 300px; width: 600px; border-top: 2px solid #C8C8C8; border-left: 2px solid #C8C8C8; border-right: 2px solid #C8C8C8; border-top-left-radius: 8px; border-top-right-radius: 8px; text-align: left}";
-    html += '.jspsych-survey-pages-container[status="inactive"] {display: none;}';
-    html += ".jspsych-survey-pages-prompt {margin: 1em 24px 0px 24px;}";
+      ".jspsych-survey-pages-container {display: grid; grid-template-columns: 1fr; width: 80vw; max-width: 640px;}";
     html +=
-      ".jspsych-survey-pages-opt {display: grid; grid-auto-flow: column; justify-content: start; justify-items: start; align-items: center; column-gap: 8px; margin-top: 4px; margin: 0.75em 36px 0px 24px; padding: 4px 0 4px 0; border: 1px solid #E8E8E8; border-radius: 4px}";
-    html += ".jspsych-survey-pages-opt:hover {background: #F0F0F0}";
-    html += '.jspsych-survey-pages-opt input[type="radio"] {height: 18px; width: 18px}';
+      ".jspsych-survey-pages-form {display: block; background-color: rgb(255,255,255); border-radius: 8px; -webkit-box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, 0.2); box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, 0.2);}";
+    html += '.jspsych-survey-pages-form[status="inactive"] {display: none;}';
     html +=
-      ".jspsych-survey-pages-nav {display: grid; grid-auto-flow: column; align-items: center; justify-content: space-between; height: 50px; width: 600px; background: #C8C8C8; border: 2px solid #C8C8C8; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; font-size: 14px;}";
-    html += '.jspsych-survey-pages-container[status="inactive"] {display: none;}';
+      ".jspsych-survey-pages-prompt {display: block; text-align: left; margin: 1em 24px 0px 24px;}";
+    html +=
+      ".jspsych-survey-pages-opt {display: grid; grid-auto-flow: column; justify-content: start; justify-items: start; align-items: center; text-align: left; column-gap: 8px; margin: 0.75em 36px 0px 24px; padding: 4px 0 4px 0;}";
+    html +=
+      ".jspsych-survey-pages-opt:hover {text-shadow: 0px 0px 1px rgba(0, 0, 0, 0.23); -webkit-text-shadow: 0px 0px 1px rgba(0, 0, 0, 0.23);}";
+    html +=
+      '.jspsych-survey-pages-opt input[type="radio"] {appearance: none; height: 18px; width: 18px; border: 1px solid rgb(199,199,199); border-radius: 100%;}';
+    html +=
+      '.jspsych-survey-pages-opt input[type="radio"]:checked {background-color: rgba(24,133,179,0.8); box-shadow: inset 0px 0px 0px 2px rgb(255,255,255);}';
+    html +=
+      '.jspsych-survey-pages-opt:hover input[type="radio"] {background-color: rgb(243,243,243)}';
+    html +=
+      '.jspsych-survey-pages-opt:hover input[type="radio"]:checked {background-color: rgba(24,133,179,1.0)}';
+    html +=
+      ".jspsych-survey-pages-nav {display: grid; grid-auto-flow: column; align-items: center; justify-content: space-between; background: rgb(200,200,200); border: 2px solid rgb(200,200,200); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; font-size: 14px;}";
     html += "</style>";
 
     // iteratively add questions
+    html += '<div class="jspsych-survey-pages-container">';
     for (var i = 0; i < trial.questions.length; i++) {
       // define question
       const question = trial.questions[question_order[i]];
 
-      // initialize form
-      html += '<form name="jspsych-survey-pages" id="jspsych-survey-pages-form-' + i + '">';
+      // define respose values
+      var response_values = [];
+      for (var j = 0; j < question.labels.length; j++) {
+        response_values.push(j);
+      }
+      if (!trial.zero_indexed) {
+        response_values = response_values.map((v) => v + 1);
+      }
+      if (question.reverse) {
+        response_values = response_values.reverse();
+      }
 
-      //
+      // initialize form
       html +=
-        '<div class="jspsych-survey-pages-container" id="jspsych-survey-pages-container-' +
+        '<form class="jspsych-survey-pages-form" name="jspsych-survey-pages-form" id="jspsych-survey-pages-form-' +
         i +
         '" status="inactive">';
+
+      // initialize container
+      // html +=
+      // '<div class="jspsych-survey-pages-container" id="jspsych-survey-pages-container-' + i + '" status="inactive">';
+
       html += '<div class="jspsych-survey-pages-prompt">' + question.prompt + "</div>";
       for (let j = 0; j < question.labels.length; j++) {
         const required = question.required ? "required" : "";
         html += '<label class="jspsych-survey-pages-opt">';
         html +=
-          '<input type="radio" name="' + question.name + '" value="0" ' + required + "></input>";
+          '<input type="radio" name="' +
+          question.name +
+          '" order="' +
+          i +
+          '" pos="' +
+          j +
+          '" value="' +
+          response_values[j] +
+          '" ' +
+          required +
+          "></input>";
         html += question.labels[j];
         html += "</label>";
       }
 
       // add navigation bar
-      // TODO: dynamic disabled
-      html += '<div class="jspsych-survey-pages-nav">';
-
-      // add back button
       const disabled = i === 0 || !trial.allow_backward ? "disabled" : "";
+      html += '<div class="jspsych-survey-pages-nav">';
       html +=
-        '<button type="button" ' +
-        'id="jspsych-survey-pages-back-' +
+        '<button type="button" id="jspsych-survey-pages-back-' +
         i +
-        '" ' +
-        'class="jspsych-btn" ' +
-        'style="margin-right: 5px;"' +
+        '" class="jspsych-btn" style="margin-right: 5px;"' +
         disabled +
-        ">" +
-        "&lt; " +
+        ">&lt; " +
         trial.button_label_previous +
         "</button>";
-
-      // add page number
-      html += "<p>" + trial.page_label + " " + i + " of " + trial.questions.length + "</p>";
-
-      // add next button
+      html += "<p>" + trial.page_label + " " + (i + 1) + " of " + trial.questions.length + "</p>";
       html +=
-        '<button type="submit" ' +
-        'id="jspsych-survey-pages-next-' +
+        '<button type="submit" id="jspsych-survey-pages-next-' +
         i +
-        '" ' +
-        'class="jspsych-btn" ' +
-        'style="margin-left: 5px;">' +
+        '" class="jspsych-btn" style="margin-left: 5px;">' +
         trial.button_label_next +
-        " &gt;" +
-        "</button>";
-      html += "</div>";
-
-      // close nav bar
+        " &gt;</button>";
       html += "</div>";
 
       // close form
       html += "</form>";
     }
+    html += "</div>";
 
-    //
+    // display HTML
     display_element.innerHTML = html;
 
+    // add radio event listeners (required to log all radio button events)
+    document
+      .querySelectorAll(
+        'form[name="jspsych-survey-pages-form"] .jspsych-survey-pages-opt input[type="radio"]'
+      )
+      .forEach((radio) => {
+        radio.addEventListener("click", recordRadioEvent);
+      });
+
     //---------------------------------------//
-    // Section 3: Convenience functions
+    // Section 3: Response handling
+    //---------------------------------------//
+
+    // initialize variables
+    var view_history = [];
+    var radio_events = [];
+
+    // define current page
+    var current_page = 0;
+
+    var start_time = performance.now();
+    var last_page_update_time = start_time;
+
+    show_current_page();
+
+    //---------------------------------------//
+    // Section 4: Convenience functions
     //---------------------------------------//
 
     function btnListener(evt) {
       // query number of selected options on current page
       const n = display_element.querySelectorAll(
-        "#jspsych-survey-pages-container-" +
+        "#jspsych-survey-pages-form-" +
           current_page +
           " .jspsych-survey-pages-opt " +
           "input[type='radio']:checked"
@@ -225,7 +278,7 @@ class PluginNamePlugin implements JsPsychPlugin<Info> {
 
     function show_current_page() {
       display_element
-        .querySelector("#jspsych-survey-pages-container-" + current_page)
+        .querySelector("#jspsych-survey-pages-form-" + current_page)
         .setAttribute("status", "active");
 
       if (current_page != 0 && trial.allow_backward) {
@@ -243,13 +296,13 @@ class PluginNamePlugin implements JsPsychPlugin<Info> {
       add_current_page_to_view_history();
 
       display_element
-        .querySelector("#jspsych-survey-pages-container-" + current_page)
+        .querySelector("#jspsych-survey-pages-form-" + current_page)
         .setAttribute("status", "inactive");
 
       current_page++;
 
       // if done, finish up...
-      if (current_page > trial.questions.length) {
+      if (current_page >= trial.questions.length) {
         endTrial();
       } else {
         show_current_page();
@@ -260,12 +313,36 @@ class PluginNamePlugin implements JsPsychPlugin<Info> {
       add_current_page_to_view_history();
 
       display_element
-        .querySelector("#jspsych-survey-pages-container-" + current_page)
+        .querySelector("#jspsych-survey-pages-form-" + current_page)
         .setAttribute("status", "inactive");
 
       current_page--;
 
       show_current_page();
+    }
+
+    /** Records the identity and timing of any radio button event on the page. */
+    function recordRadioEvent(event) {
+      // record event time
+      var current_time = performance.now();
+      var event_time = Math.round(current_time - last_page_update_time);
+
+      // record event target
+      var event_target =
+        event.srcElement.getAttribute("name") + "_" + event.srcElement.getAttribute("pos");
+
+      // store event info
+      radio_events.push({
+        event_target: event_target,
+        event_time: event_time,
+      });
+
+      // move to next page
+      if (trial.autoadvance === true) {
+        setTimeout(() => {
+          document.querySelector<HTMLElement>("#jspsych-survey-pages-next-" + current_page).click();
+        }, 160);
+      }
     }
 
     function add_current_page_to_view_history() {
@@ -276,33 +353,51 @@ class PluginNamePlugin implements JsPsychPlugin<Info> {
       view_history.push({
         page_index: current_page,
         viewing_time: page_view_time,
+        radio_events: radio_events,
       });
 
       last_page_update_time = current_time;
+      radio_events = [];
     }
 
     const endTrial = () => {
-      display_element.innerHTML = "";
+      // Remove event listeners
+      document
+        .querySelectorAll(
+          'form[name="jspsych-survey-pages-form"] .jspsych-survey-pages-opt input[type="radio"]'
+        )
+        .forEach((radio) => {
+          radio.removeEventListener("click", recordRadioEvent);
+        });
+
+      // store repsonses
+      var question_data = [];
+      document
+        .querySelectorAll(
+          'form[name="jspsych-survey-pages-form"] .jspsych-survey-pages-opt input[type="radio"]:checked'
+        )
+        .forEach((radio) => {
+          const name = radio.getAttribute("name");
+          const item_pos = parseInt(radio.getAttribute("order"));
+          const resp_pos = parseInt(radio.getAttribute("pos"));
+          const response = parseInt(radio.getAttribute("value"));
+          question_data.push({
+            name: name,
+            item_pos: item_pos,
+            resp_pos: resp_pos,
+            response: response,
+          });
+        });
 
       var trial_data = {
+        responses: question_data,
         view_history: view_history,
         rt: Math.round(performance.now() - start_time),
       };
+      display_element.innerHTML = "";
 
       this.jsPsych.finishTrial(trial_data);
     };
-
-    //---------------------------------------//
-    // Section 2: Response handling
-    //---------------------------------------//
-
-    // initialize variables
-    var view_history = [];
-
-    var start_time = performance.now();
-    var last_page_update_time = start_time;
-
-    show_current_page();
   }
 }
 
