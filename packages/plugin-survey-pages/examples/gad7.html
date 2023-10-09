@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://unpkg.com/jspsych@7.3.0"></script>
+  <script src="../dist/index.browser.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/jspsych@7.3.0/css/jspsych.css" />
+</head>
+<body></body>
+<script>
+
+  // initialize jsPsych
+  var jsPsych = initJsPsych({
+    show_progress_bar: true,
+    on_finish: function() {
+      jsPsych.data.displayData();
+    }
+  });
+
+  /*
+  define GAD-7 scale
+  - Spitzer, R. L., Kroenke, K., Williams, J. B., & Löwe, B. (2006). A brief
+    measure for assessing generalized anxiety disorder: the GAD-7. Archives of
+    internal medicine, 166(10), 1092-1097.
+  */
+
+  const labels = [
+    "Not at all",
+    "Several days",
+    "Over half the days",
+    "Nearly every day"
+  ];
+
+  var gad7 = {
+    type: jsPsychSurveyPages,
+    questions: [
+      {
+        prompt: "Feeling nervous, anxious, or on edge",
+        labels: labels,
+        reverse: false,
+        required: true
+      },
+      {
+        prompt: "Not being able to stop or control worrying",
+        labels: labels,
+        reverse: false,
+        required: true
+      },
+      {
+        prompt: "Worrying too much about different things",
+        labels: labels,
+        reverse: false,
+        required: true
+      },
+      {
+        prompt: "Trouble relaxing",
+        labels: labels,
+        reverse: false,
+        required: true
+      },
+      {
+        prompt: "Being so restless that it's hard to sit still",
+        labels: labels,
+        reverse: false,
+        required: true
+      },
+      {
+        prompt: "Becoming easily annoyed or irritable",
+        labels: labels,
+        reverse: false,
+        required: true
+      },
+      {
+        prompt: "Feeling afraid as if something awful might happen",
+        labels: labels,
+        reverse: false,
+        required: true
+      },
+    ],
+    preamble: 'Over the <b>last 2 weeks</b>, how often have you been bothered by the following problems?',
+    randomize_question_order: true,
+    autoadvance: false
+  }
+
+  // run experiment
+  jsPsych.run([gad7]);
+
+</script>
+</html>
